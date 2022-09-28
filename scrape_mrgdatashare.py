@@ -157,6 +157,9 @@ class Scraper:
         # errors handling
         self.relogin_duration = parse_args.relogin_duration
 
+        # overwrite flag
+        self.overwrite = parse_args.overwrite
+
     @staticmethod
     def get_username(parse_args):
         """Retrieves account details from CL.
@@ -289,11 +292,17 @@ class Scraper:
 
         while 'html' in result.headers.get('content-type', 'html'):
             print(
-                "Got html file as result. Wait {self.relogin_duration} seconds and re-loging...")
+                f"Got html file as result. Wait {self.relogin_duration} seconds and re-loging...")
             time.sleep(self.relogin_duration)
             self.login()
             result = self.session_requests.get(
                 url_handler.file_url, stream=True)
+
+        # Check if the file exists and downloaded
+        total_size = int(result.headers.get('content-length', 0))
+        if not self.overwrite and os.path.exists(url_handler.local_file_path) and os.path.getsize() == total_size:
+            print("file already downloaded in " + url_handler.local_file_path)
+            return True
 
         # open local file
         print(
@@ -306,7 +315,6 @@ class Scraper:
         with open(url_handler.local_file_path, 'wb') as file_handle:
 
             # iterate chunks
-            total_size = int(result.headers.get('content-length', 0))
             for chunk in tqdm(result.iter_content(
                     chunk_size=throttle.chunk_length),
                     total=math.ceil(total_size // int(throttle.chunk_length)),
@@ -728,6 +736,11 @@ if __name__ == "__main__":
         type=str,
         default=default_choice_runs_file,
         help="choice of runs recorded in a file to download, if 'all' all runs are downloaded")
+    argument_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="overwrite (re download) existing file"
+    )
 
     # parse CL
     args = argument_parser.parse_args()
